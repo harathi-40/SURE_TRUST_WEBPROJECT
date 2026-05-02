@@ -1,0 +1,154 @@
+REPORT zvar_sf_majorpro.
+
+*----------------------------------------------------------------------*
+* DATA DECLARATIONS
+*----------------------------------------------------------------------*
+
+TYPES: BEGIN OF TY_KNA1,
+  KUNNR TYPE KNA1-KUNNR,
+  NAME1 TYPE KNA1-NAME1,
+  ORT01 TYPE KNA1-ORT01,
+
+   END OF TY_KNA1.
+
+DATA: wa_bupt  TYPE but000,
+      it_kna1    TYPE ZTT_TAB46,  " Your SE11 Table Type
+      lv_fm_name TYPE rs38l_fnam,
+      wa_kna12 TYPE TY_KNA1.
+
+*----------------------------------------------------------------------*
+* SELECTION SCREEN
+*----------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK A1 WITH FRAME TITLE text-001.
+
+ PARAMETERS: p_partnr TYPE but000-partner.
+
+SELECTION-SCREEN END OF Block A1.
+
+SELECTION-SCREEN BEGIN OF BLOCK A2 WITH FRAME TITLE text-001.
+
+ PARAMETERS: p_kunnr TYPE kna1-KUNNR.
+
+SELECTION-SCREEN END OF Block A2.
+
+
+
+START-OF-SELECTION.
+* 1. TEMPLATE DATA
+  SELECT SINGLE KUNNR
+                NAME1
+                ORT01
+    FROM KNA1 INTO WA_KNA12 WHERE KUNNR = p_kunnr.
+
+* 2. Add leading zeros (e.g., convert '100' to '0000000100')
+  CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+    EXPORTING
+      input  = p_partnr
+    IMPORTING
+      output = p_partnr.
+
+* 3. Fetch Business Partner Data (The Header)
+  SELECT SINGLE partner bu_sort1 namcountry persnumber
+    FROM but000
+    INTO CORRESPONDING FIELDS OF wa_bupt
+    WHERE partner = p_partnr.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Business Partner not found in BUT000' TYPE 'I'.
+    EXIT.
+  ENDIF.
+
+* 3. Get the dynamic Function Module name of your Smart Form
+  CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+    EXPORTING
+      formname           = 'ZINVOICE_MP46'
+    IMPORTING
+      fm_name            = lv_fm_name
+    EXCEPTIONS
+      no_form            = 1
+      no_function_module = 2
+      OTHERS             = 3.
+
+  IF sy-subrc <> 0.
+    WRITE: 'Error: Smart Form ZTT_TAB46 not found or not active'.
+    EXIT.
+  ENDIF.
+
+* 4. Call the Smart Form
+* We pass WA_BUT000 (Exporting) and IT_KNA1 (Tables)
+*  CALL FUNCTION lv_fm_name
+*              CALL FUNCTION '/1BCDWB/SF00000940'
+*                EXPORTING
+**                 ARCHIVE_INDEX              =
+**                 ARCHIVE_INDEX_TAB          =
+**                 ARCHIVE_PARAMETERS         =
+**                 CONTROL_PARAMETERS         =
+**                 MAIL_APPL_OBJ              =
+**                 MAIL_RECIPIENT             =
+**                 MAIL_SENDER                =
+**                 OUTPUT_OPTIONS             =
+**                 USER_SETTINGS              = 'X'
+*                  WA_BUPT                    = WA_BUPT
+**               IMPORTING
+**                 DOCUMENT_OUTPUT_INFO       =
+**                 JOB_OUTPUT_INFO            =
+**                 JOB_OUTPUT_OPTIONS         =
+*                TABLES
+*                  IT_KNA1                    = IT_KNA1
+*               EXCEPTIONS
+*                 FORMATTING_ERROR           = 1
+*                 INTERNAL_ERROR             = 2
+*                 SEND_ERROR                 = 3
+*                 USER_CANCELED              = 4
+*                 OTHERS                     = 5
+*                        .
+**              IF SY-SUBRC <> 0.
+** Implement suitable error handling here
+*              ENDIF.
+*    EXPORTING
+**      user_settings    = 'X'
+*      wa_but000        = wa_but000
+*    TABLES
+*      it_kna1          = it_kna1
+*    EXCEPTIONS
+*      formatting_error = 1
+*      internal_error   = 2
+*      send_error       = 3
+*      user_canceled    = 4
+*      OTHERS           = 5.
+*
+*  IF sy-subrc <> 0.
+*    WRITE: 'Error occurred while generating the Smart Form'.
+*  ENDIF.
+
+
+CALL FUNCTION '/1BCDWB/SF00000940'
+  EXPORTING
+*   ARCHIVE_INDEX              =
+*   ARCHIVE_INDEX_TAB          =
+*   ARCHIVE_PARAMETERS         =
+*   CONTROL_PARAMETERS         =
+*   MAIL_APPL_OBJ              =
+*   MAIL_RECIPIENT             =
+*   MAIL_SENDER                =
+*   OUTPUT_OPTIONS             =
+*   USER_SETTINGS              = 'X'
+    WA_BUPT                    = WA_BUPT
+    WA_KNA12                   = WA_KNA12
+* IMPORTING
+*   DOCUMENT_OUTPUT_INFO       =
+*   JOB_OUTPUT_INFO            =
+*   JOB_OUTPUT_OPTIONS         =
+  TABLES
+    IT_KNA1                    = IT_KNA1
+ EXCEPTIONS
+   FORMATTING_ERROR           = 1
+   INTERNAL_ERROR             = 2
+   SEND_ERROR                 = 3
+   USER_CANCELED              = 4
+   OTHERS                     = 5
+          .
+*IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+*ENDIF.
