@@ -84,11 +84,3 @@ ALV (ABAP List Viewer)
 SUBMIT Statement
 SAP GUI
 SE38, SE11, SE80
-
-Repository Structure:
-
-SURE_TRUST_MAJOR_PROJECT/
-│
-├── SAP_ABAP_Project_Presentation.pptx
-├── SAP_ABAP_Project_Documentation.pdf
-└── README.md
