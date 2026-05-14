@@ -1,0 +1,151 @@
+*&---------------------------------------------------------------------*
+*& Report  ZME2M_REPO64
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT ZME2M_REPO64.
+
+
+TABLES: ekko, ekpo, eket, lfa1.
+
+TYPES: BEGIN OF ty_data,
+         ebeln    TYPE ekko-ebeln,
+         ebelp    TYPE ekpo-ebelp,
+         matnr    TYPE ekpo-matnr,
+         txz01    TYPE ekpo-txz01,
+         werks    TYPE ekpo-werks,
+         lifnr    TYPE ekko-lifnr,
+         name1    TYPE lfa1-name1,
+         menge    TYPE ekpo-menge,
+         wemng    TYPE eket-wemng,
+         open_qty TYPE ekpo-menge,
+         netpr    TYPE ekpo-netpr,
+         waers    TYPE ekko-waers,
+         status   TYPE char10,
+       END OF ty_data.
+
+DATA: lt_data TYPE TABLE OF ty_data,
+      ls_data TYPE ty_data.
+
+DATA: lo_alv TYPE REF TO cl_salv_table.
+
+SELECT-OPTIONS: s_matnr FOR ekpo-matnr,
+                s_werks FOR ekpo-werks.
+
+*--- Event Handler Class for Double Click ---*
+CLASS lcl_handler DEFINITION.
+  PUBLIC SECTION.
+    METHODS: on_double_click
+      FOR EVENT double_click OF cl_salv_events_table
+      IMPORTING row column.
+ENDCLASS.
+
+CLASS lcl_handler IMPLEMENTATION.
+  METHOD on_double_click.
+    READ TABLE lt_data INDEX row INTO ls_data.
+    IF sy-subrc = 0.
+      SET PARAMETER ID 'BES' FIELD ls_data-ebeln.
+      CALL TRANSACTION 'ME23N' AND SKIP FIRST SCREEN.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+*---------------------------------------------------------------------*
+* START-OF-SELECTION
+*---------------------------------------------------------------------*
+START-OF-SELECTION.
+
+  PERFORM get_data.
+  PERFORM display_alv.
+
+  " --- SUBMIT KEYWORD ---
+  IF lt_data IS NOT INITIAL.
+    SUBMIT rm06em00
+      WITH matnr IN s_matnr
+      WITH werks IN s_werks
+      VIA SELECTION-SCREEN
+      AND RETURN.
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* FORM: GET_DATA
+*---------------------------------------------------------------------*
+FORM get_data.
+  DATA: lt_ekpo TYPE TABLE OF ekpo,
+        ls_ekpo TYPE ekpo,
+        ls_ekko TYPE ekko,
+        ls_lfa1 TYPE lfa1,
+        ls_eket TYPE eket.
+
+  SELECT * FROM ekpo
+    UP TO 100 ROWS
+    INTO TABLE lt_ekpo
+    WHERE matnr IN s_matnr
+      AND werks IN s_werks.
+
+  IF lt_ekpo IS INITIAL.
+    MESSAGE 'No data found' TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  LOOP AT lt_ekpo INTO ls_ekpo.
+    CLEAR: ls_data, ls_ekko, ls_lfa1, ls_eket.
+
+    SELECT SINGLE ebeln lifnr waers INTO (ls_ekko-ebeln, ls_ekko-lifnr, ls_ekko-waers)
+      FROM ekko WHERE ebeln = ls_ekpo-ebeln.
+
+    SELECT SINGLE name1 FROM lfa1 INTO ls_lfa1-name1 WHERE lifnr = ls_ekko-lifnr.
+
+    SELECT SINGLE wemng FROM eket INTO ls_eket-wemng
+      WHERE ebeln = ls_ekpo-ebeln AND ebelp = ls_ekpo-ebelp.
+
+    ls_data-ebeln = ls_ekpo-ebeln.
+    ls_data-ebelp = ls_ekpo-ebelp.
+    ls_data-matnr = ls_ekpo-matnr.
+    ls_data-txz01 = ls_ekpo-txz01.
+    ls_data-werks = ls_ekpo-werks.
+    ls_data-lifnr = ls_ekko-lifnr.
+    ls_data-name1 = ls_lfa1-name1.
+    ls_data-menge = ls_ekpo-menge.
+    ls_data-netpr = ls_ekpo-netpr.
+    ls_data-waers = ls_ekko-waers.
+    ls_data-wemng = ls_eket-wemng.
+    ls_data-open_qty = ls_data-menge - ls_data-wemng.
+
+    IF ls_data-open_qty = 0.
+      ls_data-status = 'COMPLETE'.
+    ELSE.
+      ls_data-status = 'OPEN'.
+    ENDIF.
+
+    APPEND ls_data TO lt_data.
+  ENDLOOP.
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* FORM: DISPLAY_ALV
+*---------------------------------------------------------------------*
+FORM display_alv.
+  DATA: lo_events  TYPE REF TO cl_salv_events_table,
+        lo_handler TYPE REF TO lcl_handler.
+
+  TRY.
+      cl_salv_table=>factory(
+        IMPORTING r_salv_table = lo_alv
+        CHANGING  t_table      = lt_data ).
+
+      lo_alv->get_functions( )->set_all( abap_true ).
+      lo_alv->get_columns( )->set_optimize( abap_true ).
+
+      lo_events = lo_alv->get_event( ).
+      CREATE OBJECT lo_handler.
+      SET HANDLER lo_handler->on_double_click FOR lo_events.
+
+      lo_alv->display( ).
+
+    CATCH cx_salv_msg.
+  ENDTRY.
+ENDFORM.
